@@ -46,7 +46,8 @@ require(migrated.lanes[0].measuredAt != nil, "Legacy date is preserved")
 require(migrated.lanes.dropFirst().allSatisfy { $0.depthMM == nil }, "Migration never invents depths")
 require(migrated.notes == "from v1", "Legacy notes remain")
 let newJSON = try encoder.encode(migrated)
-require(approximatelyEqual(try decoder.decode(TireRecord.self, from: newJSON).treadDepthMM, 5.3),
+let decodedAgain = try decoder.decode(TireRecord.self, from: newJSON)
+require(approximatelyEqual(decodedAgain.treadDepthMM, 5.3),
         "Migrated record roundtrips")
 
 let emptyJSON = #"{"position":"rearRight","treadDepthMM":null,"measuredAt":null,"notes":""}"#
