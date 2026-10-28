@@ -84,7 +84,7 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		A00000000000000000000035 /* MyCarWidgets */ = {target = A00000000000000000000009 /* MyCarWidgets */; targetProxy = A00000000000000000000034 /* PBXContainerItemProxy */;};
+		A00000000000000000000035 /* MyCarWidgets */ = {isa = PBXTargetDependency; target = A00000000000000000000009 /* MyCarWidgets */; targetProxy = A00000000000000000000034 /* PBXContainerItemProxy */;};
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
