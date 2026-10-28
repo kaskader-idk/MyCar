@@ -98,8 +98,9 @@ struct DashboardView: View {
     }
 
     private var tireSummary: String {
-        let measured = store.snapshot.tires.filter { $0.treadDepthMM != nil }.count
-        return "\(measured)/4"
+        let measured = store.snapshot.tires.reduce(0) { $0 + $1.measuredLaneCount }
+        let total = store.snapshot.tires.reduce(0) { $0 + $1.lanes.count }
+        return "\(measured)/\(total)"
     }
 
     private var carBanner: some View {
