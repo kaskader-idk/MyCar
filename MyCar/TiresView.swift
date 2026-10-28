@@ -128,9 +128,12 @@ struct TiresView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(LocalizedStringKey(position.localizationKey))
                     .font(.headline)
-                Text("\(tire.measuredLaneCount)/\(tire.lanes.count) grooves measured")
-                    .font(.caption)
-                    .foregroundStyle(CarTheme.muted)
+                HStack(spacing: 4) {
+                    Text("\(tire.measuredLaneCount)/\(tire.lanes.count)")
+                    Text("grooves measured")
+                }
+                .font(.caption)
+                .foregroundStyle(CarTheme.muted)
             }
             Spacer()
             if let depth = tire.treadDepthMM {
@@ -249,9 +252,12 @@ struct TireDetailView: View {
                             Label("Tire profile", systemImage: "circle.dotted.circle.fill")
                                 .font(.headline)
                             Spacer()
-                            Text("\(grooves.count) grooves")
-                                .font(.caption.bold())
-                                .foregroundStyle(CarTheme.muted)
+                            HStack(spacing: 4) {
+                                Text("\(grooves.count)")
+                                Text("grooves")
+                            }
+                            .font(.caption.bold())
+                            .foregroundStyle(CarTheme.muted)
                         }
                         // Wide tires with many grooves can scroll instead of shrinking tap targets.
                         ScrollView(.horizontal) {
