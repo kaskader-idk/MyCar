@@ -130,3 +130,12 @@
 "mm" = "mm";
 "grooves" = "grooves";
 "grooves measured" = "grooves measured";
+
+"Vehicle photo" = "Vehicle photo";
+"Current car photo" = "Current car photo";
+"Change car photo" = "Change car photo";
+"Remove car photo" = "Remove car photo";
+"Photo could not be saved" = "Photo could not be saved";
+"Select a supported image from your photo library." = "Select a supported image from your photo library.";
+"Tap to edit" = "Tap to edit";
+"Each wheel shows only its lowest measured depth; edit individual grooves inside a tire." = "Each wheel shows only its lowest measured depth; edit individual grooves inside a tire.";
