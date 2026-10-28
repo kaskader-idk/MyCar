@@ -38,7 +38,7 @@ struct TiresView: View {
                     .buttonStyle(.plain)
                 }
 
-                Text("The lowest measured groove is shown for each tire.")
+                Text("Each wheel shows only its lowest measured depth; edit individual grooves inside a tire.")
                     .font(.caption)
                     .foregroundStyle(CarTheme.muted)
             }
@@ -103,7 +103,7 @@ struct TiresView: View {
             TireDetailView(store: store, position: position)
         } label: {
             VStack(spacing: 7) {
-                MiniTireArtwork(grooves: tire.lanes.count)
+                MiniTireArtwork()
                     .frame(width: 46, height: 84)
                 if let depth = tire.treadDepthMM {
                     Text(depth, format: .number.precision(.fractionLength(1)))
@@ -123,17 +123,14 @@ struct TiresView: View {
     private func tireRow(_ position: TirePosition) -> some View {
         let tire = store.snapshot.tire(at: position)
         return HStack(spacing: 13) {
-            MiniTireArtwork(grooves: tire.lanes.count)
+            MiniTireArtwork()
                 .frame(width: 31, height: 57)
             VStack(alignment: .leading, spacing: 4) {
                 Text(LocalizedStringKey(position.localizationKey))
                     .font(.headline)
-                HStack(spacing: 4) {
-                    Text("\(tire.measuredLaneCount)/\(tire.lanes.count)")
-                    Text("grooves measured")
-                }
-                .font(.caption)
-                .foregroundStyle(CarTheme.muted)
+                Text("Tap to edit")
+                    .font(.caption)
+                    .foregroundStyle(CarTheme.muted)
             }
             Spacer()
             if let depth = tire.treadDepthMM {
@@ -159,12 +156,10 @@ struct TiresView: View {
 }
 
 private struct MiniTireArtwork: View {
-    let grooves: Int
-
     var body: some View {
         GeometryReader { geometry in
             HStack(spacing: 2) {
-                ForEach(0..<max(1, min(grooves, 12)), id: \.self) { _ in
+                ForEach(0..<3, id: \.self) { _ in
                     RoundedRectangle(cornerRadius: 2)
                         .fill(CarTheme.raised)
                         .overlay {
