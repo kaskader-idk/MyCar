@@ -18,13 +18,65 @@ enum TirePosition: String, CaseIterable, Codable, Identifiable, Hashable {
     var isLeft: Bool { self == .frontLeft || self == .rearLeft }
 }
 
+/// One transverse measurement track in a tire, ordered from left to right as shown.
+struct TreadLane: Codable, Identifiable, Equatable {
+    var id: UUID = UUID()
+    var depthMM: Double?
+    var measuredAt: Date?
+
+    init(id: UUID = UUID(), depthMM: Double? = nil, measuredAt: Date? = nil) {
+        self.id = id
+        self.depthMM = depthMM
+        self.measuredAt = measuredAt
+    }
+}
+
 struct TireRecord: Codable, Identifiable {
     var position: TirePosition
-    var treadDepthMM: Double?
-    var measuredAt: Date?
-    var notes: String = ""
+    var lanes: [TreadLane]
+    var notes: String
 
     var id: TirePosition { position }
+
+    /// The lowest measured groove, rather than an average that masks wear.
+    var treadDepthMM: Double? { lanes.compactMap(\.depthMM).min() }
+    var measuredAt: Date? { lanes.compactMap(\.measuredAt).max() }
+    var measuredLaneCount: Int { lanes.filter { $0.depthMM != nil }.count }
+
+    init(position: TirePosition, lanes: [TreadLane] = (0..<4).map { _ in TreadLane() },
+         notes: String = "") {
+        self.position = position
+        self.lanes = lanes.isEmpty ? [TreadLane()] : lanes
+        self.notes = notes
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case position, lanes, notes, treadDepthMM, measuredAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        position = try values.decode(TirePosition.self, forKey: .position)
+        notes = try values.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        if let storedLanes = try values.decodeIfPresent([TreadLane].self, forKey: .lanes),
+           !storedLanes.isEmpty {
+            lanes = storedLanes
+        } else if let legacyDepth = try values.decodeIfPresent(Double.self, forKey: .treadDepthMM) {
+            // Upgrade data saved by MyCar v1 without guessing values for other grooves.
+            let previousDate = try values.decodeIfPresent(Date.self, forKey: .measuredAt)
+            lanes = [TreadLane(depthMM: legacyDepth, measuredAt: previousDate)]
+                + (0..<3).map { _ in TreadLane() }
+        } else {
+            lanes = (0..<4).map { _ in TreadLane() }
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(position, forKey: .position)
+        try values.encode(lanes, forKey: .lanes)
+        try values.encode(notes, forKey: .notes)
+    }
 }
 
 struct CarProfile: Codable {
