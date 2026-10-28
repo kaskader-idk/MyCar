@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct DashboardView: View {
     @ObservedObject var store: GarageStore
@@ -98,46 +99,78 @@ struct DashboardView: View {
     }
 
     private var tireSummary: String {
-        let measured = store.snapshot.tires.reduce(0) { $0 + $1.measuredLaneCount }
-        let total = store.snapshot.tires.reduce(0) { $0 + $1.lanes.count }
-        return "\(measured)/\(total)"
+        let measuredTires = TirePosition.allCases.filter {
+            store.snapshot.tire(at: $0).treadDepthMM != nil
+        }.count
+        return "\(measuredTires)/4"
     }
 
     private var carBanner: some View {
-        ZStack(alignment: .bottomLeading) {
+        ZStack {
             RoundedRectangle(cornerRadius: 26)
                 .fill(LinearGradient(colors: [
                     Color(red: 0.13, green: 0.27, blue: 0.47),
                     Color(red: 0.10, green: 0.14, blue: 0.23)
                 ], startPoint: .topLeading, endPoint: .bottomTrailing))
-            Image(systemName: "car.side.fill")
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(Color.white.opacity(0.18))
-                .frame(width: 235, height: 135)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.trailing, 10)
+
+            GeometryReader { bounds in
+                if let photo = store.carPhoto {
+                    Image(uiImage: photo)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: bounds.size.width, height: bounds.size.height)
+                        .clipped()
+                        .accessibilityHidden(true)
+                } else {
+                    Image(systemName: "car.side.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundStyle(.white.opacity(0.22))
+                        .frame(width: min(bounds.size.width * 0.8, 280), height: 135)
+                        .position(x: bounds.size.width * 0.65, y: bounds.size.height * 0.43)
+                        .accessibilityHidden(true)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 26))
+
+            LinearGradient(
+                colors: [.black.opacity(0.06), .black.opacity(0.15), .black.opacity(0.84)],
+                startPoint: .top, endPoint: .bottom
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 26))
+
             VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Spacer()
+                    VehiclePhotoButton(store: store)
+                        .labelStyle(.iconOnly)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .background(.black.opacity(0.55), in: Circle())
+                }
+                Spacer()
                 Text("ODOMETER")
                     .font(.caption2.bold())
                     .tracking(1.8)
-                    .foregroundStyle(.white.opacity(0.72))
+                    .foregroundStyle(.white.opacity(0.85))
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(car.odometerKM.formatted())
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
                         .contentTransition(.numericText())
-                    Text("km").foregroundStyle(.white.opacity(0.7))
+                    Text("km").foregroundStyle(.white.opacity(0.85))
                 }
                 if !car.manufacturer.isEmpty || !car.model.isEmpty {
                     Text([car.manufacturer, car.model].filter { !$0.isEmpty }.joined(separator: " "))
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.75))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
             }
-            .padding(23)
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
-        .frame(height: 182)
-        .accessibilityElement(children: .combine)
+        .frame(height: 230)
+        .accessibilityElement(children: .contain)
     }
 
     private func quickCard(icon: String, title: LocalizedStringKey, detail: String, tint: Color) -> some View {
@@ -156,6 +189,38 @@ struct DashboardView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
+        }
+    }
+}
+
+
+/// Opens the system photo picker without requesting full photo-library access.
+/// Used directly on the odometer card and in Settings.
+struct VehiclePhotoButton: View {
+    @ObservedObject var store: GarageStore
+    @State private var selection: PhotosPickerItem?
+    @State private var photoError = false
+
+    var body: some View {
+        PhotosPicker(selection: $selection, matching: .images) {
+            Label("Change car photo", systemImage: "camera.fill")
+        }
+        .accessibilityLabel("Change car photo")
+        .onChange(of: selection) { _, selected in
+            guard let selected else { return }
+            Task {
+                let data = try? await selected.loadTransferable(type: Data.self)
+                guard let data, store.updateCarPhoto(from: data) else {
+                    photoError = true
+                    return
+                }
+                selection = nil
+            }
+        }
+        .alert("Photo could not be saved", isPresented: $photoError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Select a supported image from your photo library.")
         }
     }
 }
