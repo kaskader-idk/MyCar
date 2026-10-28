@@ -108,3 +108,25 @@
 "MyCar Overview" = "MyCar Übersicht";
 "Car mileage, open issues and tire depth at a glance." = "Kilometerstand, Probleme und Reifenprofil auf einen Blick.";
 "Open problems" = "Offene Probleme";
+
+"Select a tire to measure every tread groove." = "Wähle einen Reifen, um jede Profilrille einzeln zu messen.";
+"The lowest measured groove is shown for each tire." = "Pro Reifen wird die niedrigste gemessene Profiltiefe angezeigt.";
+"Each groove has its own measurement." = "Jede Profilrille hat einen eigenen Messwert.";
+"Tire profile" = "Reifenprofil";
+"Grooves are ordered from left to right in the diagram." = "Die Profilrillen sind in der Grafik von links nach rechts angeordnet.";
+"Tread grooves" = "Profilrillen";
+"Groove" = "Profilrille";
+"Depth in millimeters" = "Tiefe in Millimetern";
+"Minimum measured depth" = "Niedrigste gemessene Profiltiefe";
+"Add groove" = "Profilrille hinzufügen";
+"Remove groove" = "Profilrille entfernen";
+"Remove last groove" = "Letzte Profilrille entfernen";
+"Remove groove?" = "Profilrille entfernen?";
+"The measurement for this groove will be deleted." = "Der Messwert dieser Profilrille wird gelöscht.";
+"Remove" = "Entfernen";
+"Save measurements" = "Messwerte speichern";
+"Empty fields mean a groove has not been measured." = "Leere Felder bedeuten, dass eine Profilrille noch nicht gemessen wurde.";
+"mm · min." = "mm · min.";
+"mm" = "mm";
+"grooves" = "Profilrillen";
+"grooves measured" = "Profilrillen gemessen";
