@@ -108,3 +108,25 @@
 "MyCar Overview" = "MyCar Overview";
 "Car mileage, open issues and tire depth at a glance." = "Car mileage, open issues and tire depth at a glance.";
 "Open problems" = "Open problems";
+
+"Select a tire to measure every tread groove." = "Select a tire to measure every tread groove.";
+"The lowest measured groove is shown for each tire." = "The lowest measured groove is shown for each tire.";
+"Each groove has its own measurement." = "Each groove has its own measurement.";
+"Tire profile" = "Tire profile";
+"Grooves are ordered from left to right in the diagram." = "Grooves are ordered from left to right in the diagram.";
+"Tread grooves" = "Tread grooves";
+"Groove" = "Groove";
+"Depth in millimeters" = "Depth in millimeters";
+"Minimum measured depth" = "Minimum measured depth";
+"Add groove" = "Add groove";
+"Remove groove" = "Remove groove";
+"Remove last groove" = "Remove last groove";
+"Remove groove?" = "Remove groove?";
+"The measurement for this groove will be deleted." = "The measurement for this groove will be deleted.";
+"Remove" = "Remove";
+"Save measurements" = "Save measurements";
+"Empty fields mean a groove has not been measured." = "Empty fields mean a groove has not been measured.";
+"mm · min." = "mm · min.";
+"mm" = "mm";
+"grooves" = "grooves";
+"grooves measured" = "grooves measured";
