@@ -16,6 +16,24 @@ struct SettingsView: View {
                 LabeledContent("Odometer", value: "\(store.snapshot.car.odometerKM.formatted()) km")
                 Button("Edit vehicle") { isEditingCar = true }
             }
+            Section("Vehicle photo") {
+                if let photo = store.carPhoto {
+                    Image(uiImage: photo)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 145)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .accessibilityLabel("Current car photo")
+                }
+                VehiclePhotoButton(store: store)
+                if store.carPhoto != nil {
+                    Button("Remove car photo", role: .destructive) {
+                        store.removeCarPhoto()
+                    }
+                }
+            }
             Section("Appearance") {
                 Picker("Language", selection: $language) {
                     Text("System default").tag("system")
