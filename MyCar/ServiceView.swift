@@ -43,7 +43,7 @@ struct ServiceView: View {
                                 HStack {
                                     Label("Due at", systemImage: "speedometer")
                                     Spacer()
-                                    Text("\(km.formatted()) km").fontWeight(.bold())
+                                    Text("\(km.formatted()) km").fontWeight(.bold)
                                 }
                                 if let distance = reminder.distanceUntilDue(odometer: store.snapshot.car.odometerKM) {
                                     Text(distance <= 0 ? "Mileage target reached" : "\(distance.formatted()) km remaining")
