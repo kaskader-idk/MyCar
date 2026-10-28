@@ -130,3 +130,12 @@
 "mm" = "mm";
 "grooves" = "Profilrillen";
 "grooves measured" = "Profilrillen gemessen";
+
+"Vehicle photo" = "Autofoto";
+"Current car photo" = "Aktuelles Autofoto";
+"Change car photo" = "Autofoto ändern";
+"Remove car photo" = "Autofoto entfernen";
+"Photo could not be saved" = "Autofoto konnte nicht gespeichert werden";
+"Select a supported image from your photo library." = "Wähle ein unterstütztes Bild aus deiner Fotomediathek.";
+"Tap to edit" = "Tippen zum Bearbeiten";
+"Each wheel shows only its lowest measured depth; edit individual grooves inside a tire." = "Jeder Reifen zeigt nur die niedrigste gemessene Profiltiefe; einzelne Profilrillen bearbeitest du im Reifen.";
