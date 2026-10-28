@@ -5,7 +5,7 @@ A native **SwiftUI iPhone app** for keeping track of your vehicle, tire tread de
 ## Features
 
 - Dark dashboard with vehicle name, model, mileage, tire measurement count, open problems, and next service.
-- Four independently editable tires (front left/right and rear left/right). Tap a tire in the car diagram or list to open a full-screen detail view. Depth is entered in **millimeters** and notes and measurement dates are stored.
+- Four independently editable tires (front left/right and rear left/right). Each tire has its own editable **tread grooves** (default: 4, adjustable from 1 to 12 with +/- controls). Every groove stores a separate depth in **millimeters** and measurement date, while the tire overview shows the lowest measured depth. Tap a tire in the car diagram or list to open its enlarged profile and editor. Removing a measured groove asks for confirmation.
 - Problems with title, details, a **1–99 priority** (1 = most urgent), editing, delete, resolve/reopen, and priority/date sorting.
 - Service reminder by **date and/or odometer**, with notes and last service date; overdue and remaining time/distance displays.
 - **WidgetKit widgets:** MyCar Service (small and medium) and MyCar Overview (medium).
@@ -34,7 +34,7 @@ GitHub Actions builds the iPhone app and uploads an unsigned **MyCar-unsigned.ip
 
 ## Storage
 
-The app and widgets read/write `garage.snapshot.v1` in `UserDefaults(suiteName: "group.dev.kaskader.mycar")` as JSON. If the suite is unavailable the app falls back to its own preferences, so car data entry remains usable; widget sharing still requires the entitlement. Modifying or deleting the app can delete stored data; there is currently no cloud sync or backup/export.
+Existing v1 single-depth values are automatically migrated into the first groove; remaining grooves stay unmeasured instead of receiving invented values. The app and widgets read/write `garage.snapshot.v1` in `UserDefaults(suiteName: "group.dev.kaskader.mycar")` as JSON. If the suite is unavailable the app falls back to its own preferences, so car data entry remains usable; widget sharing still requires the entitlement. Modifying or deleting the app can delete stored data; there is currently no cloud sync or backup/export.
 
 ## Code layout
 
