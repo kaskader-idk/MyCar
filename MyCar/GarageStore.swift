@@ -20,10 +20,11 @@ final class GarageStore: ObservableObject {
         commit { $0.car = car }
     }
 
-    func updateTire(position: TirePosition, treadDepthMM: Double?, notes: String) {
+    func updateTire(position: TirePosition, lanes: [TreadLane], notes: String) {
         commit { snapshot in
-            let new = TireRecord(position: position, treadDepthMM: treadDepthMM,
-                                 measuredAt: treadDepthMM == nil ? nil : .now, notes: notes)
+            // Every groove has a stable ID so edits and removals stay attached to
+            // the correct measurement rather than shifting data between grooves.
+            let new = TireRecord(position: position, lanes: lanes, notes: notes)
             if let index = snapshot.tires.firstIndex(where: { $0.position == position }) {
                 snapshot.tires[index] = new
             } else {
