@@ -176,7 +176,8 @@ struct ServiceReminder: Codable {
     }
 }
 
-struct GarageSnapshot: Codable {
+struct GarageSnapshot: Codable, Identifiable {
+    var id: UUID = UUID()
     var car: CarProfile
     var tireSets: [TireSet]
     var activeTireSetID: UUID
@@ -204,11 +205,12 @@ struct GarageSnapshot: Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case car, tireSets, activeTireSetID, tires, issues, service
+        case id, car, tireSets, activeTireSetID, tires, issues, service
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         car = try c.decodeIfPresent(CarProfile.self, forKey: .car) ?? CarProfile()
         issues = try c.decodeIfPresent([CarIssue].self, forKey: .issues) ?? []
         service = try c.decodeIfPresent(ServiceReminder.self, forKey: .service) ?? ServiceReminder()
@@ -232,6 +234,7 @@ struct GarageSnapshot: Codable {
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
         try c.encode(car, forKey: .car)
         try c.encode(tireSets, forKey: .tireSets)
         try c.encode(activeTireSetID, forKey: .activeTireSetID)
@@ -240,26 +243,96 @@ struct GarageSnapshot: Codable {
     }
 }
 
+struct GarageArchive: Codable {
+    var cars: [GarageSnapshot]
+    var selectedCarID: UUID
+
+    init() {
+        let first = GarageSnapshot()
+        cars = [first]
+        selectedCarID = first.id
+    }
+
+    var selected: GarageSnapshot {
+        cars.first(where: { $0.id == selectedCarID }) ?? cars[0]
+    }
+
+    private enum CodingKeys: String, CodingKey { case cars, selectedCarID }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let decoded = try c.decode([GarageSnapshot].self, forKey: .cars)
+        cars = decoded.isEmpty ? [GarageSnapshot()] : decoded
+        let chosen = try c.decode(UUID.self, forKey: .selectedCarID)
+        selectedCarID = cars.contains(where: { $0.id == chosen }) ? chosen : cars[0].id
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(cars, forKey: .cars)
+        try c.encode(selectedCarID, forKey: .selectedCarID)
+    }
+}
+
 enum GaragePersistence {
     static let appGroup = "group.dev.kaskader.mycar"
     static let key = "garage.snapshot.v1"
+    static let archiveKey = "garage.archive.v2"
 
-    private static var sharedDefaults: UserDefaults {
-        UserDefaults(suiteName: appGroup) ?? .standard
+    static var sharedDefaults: UserDefaults? { UserDefaults(suiteName: appGroup) }
+
+    static func loadArchive() -> GarageArchive {
+        if let data = sharedDefaults?.data(forKey: archiveKey)
+             ?? UserDefaults.standard.data(forKey: archiveKey),
+           let saved = try? JSONDecoder().decode(GarageArchive.self, from: data) {
+            return saved
+        }
+        if let old = sharedDefaults?.data(forKey: key)
+             ?? UserDefaults.standard.data(forKey: key),
+           let car = try? JSONDecoder().decode(GarageSnapshot.self, from: old) {
+            var archive = GarageArchive()
+            archive.cars = [car]
+            archive.selectedCarID = car.id
+            return archive
+        }
+        return GarageArchive()
     }
 
-    static func load() -> GarageSnapshot {
-        guard let data = sharedDefaults.data(forKey: key),
-              let snapshot = try? JSONDecoder().decode(GarageSnapshot.self, from: data) else {
-            return GarageSnapshot()
+    static func load() -> GarageSnapshot { loadArchive().selected }
+
+    /// Widgets cannot access the main application's standard defaults.
+    static func loadForWidget() -> GarageSnapshot? {
+        guard let defaults = sharedDefaults else { return nil }
+        if let data = defaults.data(forKey: archiveKey),
+           let archive = try? JSONDecoder().decode(GarageArchive.self, from: data) {
+            return archive.selected
         }
-        return snapshot
+        if let data = defaults.data(forKey: key) {
+            return try? JSONDecoder().decode(GarageSnapshot.self, from: data)
+        }
+        return nil
+    }
+
+    @discardableResult
+    static func saveArchive(_ archive: GarageArchive) -> Bool {
+        guard let data = try? JSONEncoder().encode(archive),
+              let selected = try? JSONEncoder().encode(archive.selected) else { return false }
+        UserDefaults.standard.set(data, forKey: archiveKey)
+        UserDefaults.standard.set(selected, forKey: key)
+        sharedDefaults?.set(data, forKey: archiveKey)
+        sharedDefaults?.set(selected, forKey: key)
+        return true
     }
 
     @discardableResult
     static func save(_ snapshot: GarageSnapshot) -> Bool {
-        guard let data = try? JSONEncoder().encode(snapshot) else { return false }
-        sharedDefaults.set(data, forKey: key)
-        return true
+        var archive = loadArchive()
+        if let index = archive.cars.firstIndex(where: { $0.id == snapshot.id }) {
+            archive.cars[index] = snapshot
+        } else {
+            archive.cars.append(snapshot)
+        }
+        archive.selectedCarID = snapshot.id
+        return saveArchive(archive)
     }
 }
