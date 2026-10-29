@@ -12,6 +12,9 @@ final class GarageStore: ObservableObject {
 
     init() {
         archive = GaragePersistence.loadArchive()
+        // Seed shared storage even before the user edits anything.
+        GaragePersistence.saveArchive(archive)
+        WidgetCenter.shared.reloadAllTimelines()
         carPhoto = CarPhotoStorage.load(id: archive.selectedCarID)
     }
 
