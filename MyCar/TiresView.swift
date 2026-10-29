@@ -1,405 +1,506 @@
 import SwiftUI
 
+/// Colors are visual condition hints only, not legal tread-depth limits.
+private enum TreadVisual {
+    static func color(_ mm: Double?) -> Color {
+        guard let mm else { return CarTheme.muted }
+        if mm >= 5 { return CarTheme.success }
+        if mm >= 3.5 { return .yellow }
+        if mm >= 1.6 { return CarTheme.warning }
+        return CarTheme.danger
+    }
+}
+
+/// A single tire, divided into adjacent measurement channels with no card gaps.
+/// Each channel shows a colored vertical bar proportional to its tread depth.
+private struct ConnectedTreadView: View {
+    let lanes: [TreadLane]
+    var height: CGFloat = 158
+    var showValues: Bool = true
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(lanes.enumerated()), id: \.element.id) { index, lane in
+                VStack(spacing: 6) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .bottom) {
+                            Rectangle()
+                                .fill(LinearGradient(colors: [
+                                    Color(red: 0.23, green: 0.29, blue: 0.39),
+                                    CarTheme.background,
+                                    Color(red: 0.20, green: 0.25, blue: 0.33)
+                                ], startPoint: .leading, endPoint: .trailing))
+                            VStack(spacing: 0) {
+                                ForEach(0..<11, id: \.self) { _ in
+                                    Capsule()
+                                        .fill(.white.opacity(0.12))
+                                        .frame(height: 2.5)
+                                        .frame(maxHeight: .infinity)
+                                        .padding(.horizontal, 3)
+                                }
+                            }
+                            .padding(.vertical, 10)
+
+                            if let mm = lane.depthMM {
+                                Capsule()
+                                    .fill(TreadVisual.color(mm))
+                                    .frame(width: max(3, min(6, geo.size.width * 0.15)),
+                                           height: max(6, (geo.size.height - 20) *
+                                                min(max(CGFloat(mm) / 8, 0), 1)))
+                                    .shadow(color: TreadVisual.color(mm).opacity(0.55), radius: 3)
+                                    .padding(.bottom, 9)
+                            } else {
+                                Capsule().fill(CarTheme.muted.opacity(0.4))
+                                    .frame(width: 3, height: 12)
+                                    .padding(.bottom, 9)
+                            }
+                        }
+                        .overlay {
+                            Rectangle().stroke(.white.opacity(0.16), lineWidth: 0.5)
+                        }
+                    }
+                    .frame(height: height)
+                    if showValues {
+                        Text("\(index + 1)")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(CarTheme.muted)
+                        HStack(spacing: 1) {
+                            if let mm = lane.depthMM {
+                                Text(mm, format: .number.precision(.fractionLength(1)))
+                                    .foregroundStyle(TreadVisual.color(mm))
+                            } else {
+                                Text("—").foregroundStyle(CarTheme.muted)
+                            }
+                        }
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal, 2)
+        .padding(.top, 2)
+        .background(CarTheme.background.opacity(0.4))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(CarTheme.accent.opacity(0.7), lineWidth: 1.3)
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
 struct TiresView: View {
     @ObservedObject var store: GarageStore
+    @State private var creatingSet = false
+    @State private var editingSet: TireSet?
+    @State private var removalPosition: TirePosition?
+
+    private var set: TireSet? { store.snapshot.activeTireSet }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("Tread depth")
-                        .font(.largeTitle.bold())
-                    Text("Select a tire to measure every tread groove.")
-                        .font(.subheadline)
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Tires").font(.largeTitle.bold())
+
+                if let set {
+                    Panel {
+                        VStack(alignment: .leading, spacing: 13) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text("Selected tire set")
+                                        .font(.caption).foregroundStyle(CarTheme.muted)
+                                    Text(set.name).font(.title3.bold()).lineLimit(2)
+                                    Text(LocalizedStringKey(set.season.titleKey))
+                                        .font(.caption).foregroundStyle(CarTheme.accent)
+                                }
+                                Spacer()
+                                Button { editingSet = set } label: {
+                                    Image(systemName: "pencil")
+                                        .frame(width: 40, height: 40)
+                                }
+                                .buttonStyle(.bordered)
+                                .accessibilityLabel("Edit tire set")
+                            }
+
+                            Menu {
+                                ForEach(store.snapshot.tireSets) { item in
+                                    Button {
+                                        store.selectTireSet(item.id)
+                                    } label: {
+                                        if item.id == set.id {
+                                            Label(item.name, systemImage: "checkmark")
+                                        } else {
+                                            Text(item.name)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label("Switch tire set", systemImage: "chevron.up.chevron.down")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            Button { creatingSet = true } label: {
+                                Label("Add tire set", systemImage: "plus.circle.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+
+                    Text("FRONT")
+                        .font(.caption.bold())
+                        .tracking(2)
                         .foregroundStyle(CarTheme.muted)
-                }
-
-                Panel {
-                    VStack(spacing: 10) {
-                        Text("FRONT")
-                            .font(.caption2.bold())
-                            .tracking(2)
-                            .foregroundStyle(CarTheme.muted)
-                        vehicleDiagram
-                        Text("REAR")
-                            .font(.caption2.bold())
-                            .tracking(2)
-                            .foregroundStyle(CarTheme.muted)
+                        .frame(maxWidth: .infinity)
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
+                                        GridItem(.flexible(), spacing: 12)], spacing: 14) {
+                        ForEach([TirePosition.frontLeft, .frontRight, .rearLeft, .rearRight]) { position in
+                            tireTile(set: set, position: position)
+                        }
                     }
-                }
+                    Text("REAR")
+                        .font(.caption.bold())
+                        .tracking(2)
+                        .foregroundStyle(CarTheme.muted)
+                        .frame(maxWidth: .infinity)
 
-                SectionLabel(title: "Measurements", symbol: "ruler")
-                ForEach(TirePosition.allCases) { position in
-                    NavigationLink {
-                        TireDetailView(store: store, position: position)
-                    } label: {
-                        tireRow(position)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Tread depth status", systemImage: "ruler").font(.headline)
+                        HStack(spacing: 11) {
+                            legend("5+ mm", color: CarTheme.success)
+                            legend("3.5+", color: .yellow)
+                            legend("1.6+", color: CarTheme.warning)
+                            legend("<1.6", color: CarTheme.danger)
+                        }
+                        Text("Colors are indicative only; requirements depend on tire type and local law.")
+                            .font(.caption).foregroundStyle(CarTheme.muted)
                     }
-                    .buttonStyle(.plain)
+                    .padding(16)
+                    .background(CarTheme.surface, in: RoundedRectangle(cornerRadius: 18))
                 }
-
-                Text("Each wheel shows only its lowest measured depth; edit individual grooves inside a tire.")
-                    .font(.caption)
-                    .foregroundStyle(CarTheme.muted)
             }
-            .padding(20)
+            .padding(18)
         }
         .scrollIndicators(.hidden)
         .navigationTitle("Tires")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $creatingSet) { TireSetEditorView(store: store, existing: nil) }
+        .sheet(item: $editingSet) { item in TireSetEditorView(store: store, existing: item) }
+        .alert("Remove last groove?", isPresented: Binding(
+            get: { removalPosition != nil },
+            set: { if !$0 { removalPosition = nil } }
+        )) {
+            Button("Remove", role: .destructive) {
+                if let removalPosition, let set {
+                    store.changeGrooveCount(position: removalPosition, setID: set.id, change: -1)
+                }
+                removalPosition = nil
+            }
+            Button("Cancel", role: .cancel) { removalPosition = nil }
+        } message: {
+            Text("The last groove's measurement will be deleted.")
+        }
         .carPage()
     }
 
-    private var vehicleDiagram: some View {
-        ZStack {
-            // Simplified top-down car shape, leaving space for four tappable wheels.
-            RoundedRectangle(cornerRadius: 43)
-                .fill(LinearGradient(colors: [
-                    Color(red: 0.19, green: 0.29, blue: 0.44),
-                    Color(red: 0.09, green: 0.14, blue: 0.23)
-                ], startPoint: .top, endPoint: .bottom))
-                .frame(width: 147, height: 297)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 43)
-                        .stroke(.white.opacity(0.15), lineWidth: 2)
-                }
-                .overlay {
-                    VStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 19)
-                            .fill(CarTheme.background.opacity(0.65))
-                            .frame(width: 99, height: 66)
-                        RoundedRectangle(cornerRadius: 13)
-                            .stroke(.white.opacity(0.13), lineWidth: 2)
-                            .frame(width: 105, height: 79)
-                        Spacer()
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(CarTheme.background.opacity(0.55))
-                            .frame(width: 97, height: 57)
-                    }
-                    .padding(.vertical, 20)
-                }
-            VStack {
-                axle(left: .frontLeft, right: .frontRight)
-                Spacer()
-                axle(left: .rearLeft, right: .rearRight)
-            }
-            .padding(.vertical, 24)
+    private func legend(_ label: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text(label).font(.system(size: 10)).lineLimit(1)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 340)
     }
 
-    private func axle(left: TirePosition, right: TirePosition) -> some View {
-        HStack {
-            tireLink(left)
-            Spacer(minLength: 125)
-            tireLink(right)
-        }
-    }
-
-    private func tireLink(_ position: TirePosition) -> some View {
-        let tire = store.snapshot.tire(at: position)
-        return NavigationLink {
-            TireDetailView(store: store, position: position)
-        } label: {
-            VStack(spacing: 7) {
-                MiniTireArtwork()
-                    .frame(width: 46, height: 84)
-                if let depth = tire.treadDepthMM {
-                    Text(depth, format: .number.precision(.fractionLength(1)))
+    private func tireTile(set: TireSet, position: TirePosition) -> some View {
+        let tire = set.tire(at: position)
+        return VStack(spacing: 10) {
+            NavigationLink {
+                TireDetailView(store: store, setID: set.id, position: position)
+            } label: {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(LocalizedStringKey(position.localizationKey))
+                        .font(.subheadline.bold())
+                    ConnectedTreadView(lanes: tire.lanes, height: 112)
+                    Text(tire.size.isEmpty ? "Tire size not set" : tire.size)
                         .font(.caption.bold())
-                    + Text(" mm").font(.caption2)
-                } else {
-                    Text("—").font(.caption.bold())
-                }
-            }
-            .frame(minWidth: 62, minHeight: 110)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(LocalizedStringKey(position.localizationKey)))
-    }
-
-    private func tireRow(_ position: TirePosition) -> some View {
-        let tire = store.snapshot.tire(at: position)
-        return HStack(spacing: 13) {
-            MiniTireArtwork()
-                .frame(width: 31, height: 57)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(LocalizedStringKey(position.localizationKey))
-                    .font(.headline)
-                Text("Tap to edit")
-                    .font(.caption)
-                    .foregroundStyle(CarTheme.muted)
-            }
-            Spacer()
-            if let depth = tire.treadDepthMM {
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text(depth, format: .number.precision(.fractionLength(1)))
-                        .font(.title3.bold().monospacedDigit())
-                    Text("mm · min.")
-                        .font(.caption2)
                         .foregroundStyle(CarTheme.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    if !tire.manufacturer.isEmpty || !tire.model.isEmpty {
+                        Text([tire.manufacturer, tire.model].filter { !$0.isEmpty }.joined(separator: " "))
+                            .font(.caption2)
+                            .foregroundStyle(CarTheme.muted)
+                            .lineLimit(1)
+                    }
                 }
-            } else {
-                Text("Not measured")
-                    .font(.subheadline)
-                    .foregroundStyle(CarTheme.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            Image(systemName: "chevron.right")
-                .font(.caption.bold())
-                .foregroundStyle(CarTheme.muted)
+            .buttonStyle(.plain)
+            HStack {
+                Button {
+                    guard tire.lanes.count > 1 else { return }
+                    if tire.lanes.last?.depthMM != nil {
+                        removalPosition = position
+                    } else {
+                        store.changeGrooveCount(position: position, setID: set.id, change: -1)
+                    }
+                } label: {
+                    Image(systemName: "minus").frame(maxWidth: .infinity)
+                }
+                .disabled(tire.lanes.count <= 1)
+                .accessibilityLabel("Remove last groove")
+                Button {
+                    store.changeGrooveCount(position: position, setID: set.id, change: 1)
+                } label: {
+                    Image(systemName: "plus").frame(maxWidth: .infinity)
+                }
+                .disabled(tire.lanes.count >= 12)
+                .accessibilityLabel("Add groove")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            Text("\(tire.lanes.count) grooves")
+                .font(.caption2).foregroundStyle(CarTheme.muted)
         }
-        .padding(15)
-        .background(CarTheme.surface, in: RoundedRectangle(cornerRadius: 19))
+        .padding(12)
+        .background(CarTheme.surface, in: RoundedRectangle(cornerRadius: 18))
     }
 }
 
-private struct MiniTireArtwork: View {
+struct TireSetEditorView: View {
+    @ObservedObject var store: GarageStore
+    let existing: TireSet?
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var season: TireSeason
+    @State private var confirmDelete = false
+
+    init(store: GarageStore, existing: TireSet?) {
+        self.store = store
+        self.existing = existing
+        _name = State(initialValue: existing?.name ?? "")
+        _season = State(initialValue: existing?.season ?? .summer)
+    }
+
     var body: some View {
-        GeometryReader { geometry in
-            HStack(spacing: 2) {
-                ForEach(0..<3, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(CarTheme.raised)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 2)
-                                .stroke(.white.opacity(0.28), lineWidth: 0.6)
+        NavigationStack {
+            Form {
+                Section("Tire set") {
+                    TextField("Name (e.g. Winter 2026)", text: $name)
+                    Picker("Tire type", selection: $season) {
+                        ForEach(TireSeason.allCases) { type in
+                            Text(LocalizedStringKey(type.titleKey)).tag(type)
                         }
+                    }
+                }
+                Section {
+                    Text("Each set has four separate tires. Open a wheel to edit its size, manufacturer, model, DOT and tread measurements.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                if existing != nil && store.snapshot.tireSets.count > 1 {
+                    Section {
+                        Button("Delete tire set", role: .destructive) { confirmDelete = true }
+                    }
                 }
             }
-            .padding(5)
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(CarTheme.accent.opacity(0.85), lineWidth: 1.5)
+            .scrollContentBackground(.hidden)
+            .background(CarTheme.background)
+            .navigationTitle(existing == nil ? "Add tire set" : "Edit tire set")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let existing {
+                            store.updateTireSet(id: existing.id, name: cleaned, season: season)
+                        } else {
+                            store.createTireSet(name: cleaned, season: season)
+                        }
+                        dismiss()
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
+            .confirmationDialog("Delete tire set?", isPresented: $confirmDelete) {
+                Button("Delete tire set", role: .destructive) {
+                    if let existing { store.deleteTireSet(existing.id) }
+                    dismiss()
+                }
+            } message: {
+                Text("This deletes all four tires and their measurements in this set.")
+            }
+            .preferredColorScheme(.dark)
         }
     }
 }
 
 private struct GrooveDraft: Identifiable {
-    var id: UUID
+    let id: UUID
     var text: String
-    var originalValue: Double?
-    var measuredAt: Date?
+    let original: Double?
+    let date: Date?
 
     init(_ lane: TreadLane) {
         id = lane.id
         text = lane.depthMM.map { String(format: "%.1f", $0) } ?? ""
-        originalValue = lane.depthMM
-        measuredAt = lane.measuredAt
+        original = lane.depthMM
+        date = lane.measuredAt
     }
 
     var value: Double? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        return Double(trimmed.replacingOccurrences(of: ",", with: "."))
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+        return cleaned.isEmpty ? nil : Double(cleaned)
     }
 
     var isValid: Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty || (value.map { $0.isFinite && (0...15).contains($0) } ?? false)
+        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        || (value.map { $0.isFinite && (0...15).contains($0) } ?? false)
     }
 
     func stored() -> TreadLane {
-        let newValue = value
-        return TreadLane(id: id, depthMM: newValue,
-                         measuredAt: newValue == nil ? nil :
-                             (newValue == originalValue ? (measuredAt ?? .now) : .now))
+        let mm = value
+        return TreadLane(id: id, depthMM: mm,
+                         measuredAt: mm == nil ? nil : (mm == original ? (date ?? .now) : .now))
     }
 }
 
 struct TireDetailView: View {
     @ObservedObject var store: GarageStore
+    let setID: UUID
     let position: TirePosition
+
     @Environment(\.dismiss) private var dismiss
     @State private var grooves: [GrooveDraft]
     @State private var notes: String
+    @State private var manufacturer: String
+    @State private var model: String
+    @State private var size: String
+    @State private var dot: String
     @State private var pendingRemoval: UUID?
 
-    init(store: GarageStore, position: TirePosition) {
+    init(store: GarageStore, setID: UUID, position: TirePosition) {
         self.store = store
+        self.setID = setID
         self.position = position
-        let tire = store.snapshot.tire(at: position)
+        let tire = store.snapshot.tireSets.first(where: { $0.id == setID })?
+            .tire(at: position) ?? TireRecord(position: position)
         _grooves = State(initialValue: tire.lanes.map(GrooveDraft.init))
         _notes = State(initialValue: tire.notes)
+        _manufacturer = State(initialValue: tire.manufacturer)
+        _model = State(initialValue: tire.model)
+        _size = State(initialValue: tire.size)
+        _dot = State(initialValue: tire.dot)
     }
 
-    private var canSave: Bool { grooves.allSatisfy(\.isValid) }
-    private var minimumDepth: Double? { grooves.compactMap(\.value).min() }
+    private var valid: Bool { grooves.allSatisfy(\.isValid) }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(LocalizedStringKey(position.localizationKey))
-                        .font(.largeTitle.bold())
-                    Text("Each groove has its own measurement.")
-                        .font(.subheadline)
-                        .foregroundStyle(CarTheme.muted)
-                }
+            VStack(alignment: .leading, spacing: 18) {
+                Text(LocalizedStringKey(position.localizationKey))
+                    .font(.largeTitle.bold())
+                Text("Each tread groove has its own measurement.")
+                    .font(.subheadline).foregroundStyle(CarTheme.muted)
 
                 Panel {
-                    VStack(spacing: 15) {
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            Label("Tire profile", systemImage: "circle.dotted.circle.fill")
+                            Label("Tire profile", systemImage: "circle.dotted.circle")
                                 .font(.headline)
                             Spacer()
-                            HStack(spacing: 4) {
-                                Text("\(grooves.count)")
-                                Text("grooves")
-                            }
-                            .font(.caption.bold())
-                            .foregroundStyle(CarTheme.muted)
+                            Text("\(grooves.count)")
+                                .font(.caption.bold())
+                            Text("grooves")
+                                .font(.caption).foregroundStyle(CarTheme.muted)
                         }
-                        // Wide tires with many grooves can scroll instead of shrinking tap targets.
-                        ScrollView(.horizontal) {
-                            HStack(spacing: 6) {
-                                ForEach(Array(grooves.enumerated()), id: \.element.id) { index, groove in
-                                    VStack(spacing: 9) {
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(LinearGradient(colors: [
-                                                Color(red: 0.24, green: 0.29, blue: 0.37),
-                                                Color(red: 0.07, green: 0.10, blue: 0.16),
-                                                Color(red: 0.24, green: 0.29, blue: 0.37)
-                                            ], startPoint: .leading, endPoint: .trailing))
-                                            .overlay {
-                                                VStack(spacing: 9) {
-                                                    ForEach(0..<12, id: \.self) { _ in
-                                                        Capsule()
-                                                            .fill(.white.opacity(0.12))
-                                                            .frame(width: 24, height: 4)
-                                                    }
-                                                }
-                                            }
-                                            .overlay {
-                                                RoundedRectangle(cornerRadius: 10)
-                                                    .stroke(CarTheme.accent.opacity(0.50), lineWidth: 1)
-                                            }
-                                            .frame(width: 55, height: 224)
-                                        Text("\(index + 1)")
-                                            .font(.caption.bold())
-                                        Text(groove.value.map { String(format: "%.1f", $0) } ?? "—")
-                                            .font(.caption.bold().monospacedDigit())
-                                            .foregroundStyle(CarTheme.accent)
-                                        Text("mm")
-                                            .font(.caption2)
-                                            .foregroundStyle(CarTheme.muted)
-                                    }
-                                    .frame(width: 55)
-                                }
-                            }
-                            .padding(.horizontal, 4)
-                            .frame(maxWidth: .infinity)
-                        }
-                        .scrollIndicators(.hidden)
-                        Text("Grooves are ordered from left to right in the diagram.")
-                            .font(.caption)
-                            .foregroundStyle(CarTheme.muted)
-                            .multilineTextAlignment(.center)
+                        ConnectedTreadView(lanes: grooves.map { $0.stored() },
+                                           height: 220, showValues: true)
+                        Text("Grooves are arranged from left to right. Colored bars indicate depth.")
+                            .font(.caption).foregroundStyle(CarTheme.muted)
                     }
                 }
 
                 Panel {
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack(alignment: .center) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                SectionLabel(title: "Tread grooves", symbol: "ruler")
-                                Text("Depth in millimeters")
-                                    .font(.caption)
-                                    .foregroundStyle(CarTheme.muted)
-                            }
-                            Spacer()
-                            Button {
-                                requestRemoval(grooves.last?.id)
-                            } label: {
-                                Image(systemName: "minus")
-                                    .frame(width: 33, height: 33)
-                            }
-                            .disabled(grooves.count <= 1)
-                            .accessibilityLabel("Remove last groove")
-                            .buttonStyle(.bordered)
-                            Button {
-                                if grooves.count < 12 {
-                                    grooves.append(GrooveDraft(TreadLane()))
-                                }
-                            } label: {
-                                Image(systemName: "plus")
-                                    .frame(width: 33, height: 33)
-                            }
-                            .disabled(grooves.count >= 12)
-                            .accessibilityLabel("Add groove")
-                            .buttonStyle(.borderedProminent)
-                        }
-
-                        ForEach(Array(grooves.enumerated()), id: \.element.id) { index, groove in
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack(spacing: 11) {
-                                    Text("\(index + 1)")
-                                        .font(.headline.monospacedDigit())
-                                        .foregroundStyle(CarTheme.accent)
-                                        .frame(width: 28, height: 40)
-                                        .background(CarTheme.raised, in: RoundedRectangle(cornerRadius: 9))
-                                    Text("Groove")
-                                        .font(.subheadline.weight(.medium))
-                                    Spacer(minLength: 2)
-                                    TextField("—", text: $grooves[index].text)
-                                        .keyboardType(.decimalPad)
-                                        .multilineTextAlignment(.trailing)
-                                        .font(.title3.bold().monospacedDigit())
-                                        .frame(minWidth: 58, maxWidth: 95)
-                                        .padding(.vertical, 9)
-                                        .padding(.horizontal, 10)
-                                        .background(CarTheme.raised, in: RoundedRectangle(cornerRadius: 10))
-                                        .accessibilityLabel("Depth in millimeters")
-                                    Text("mm")
-                                        .font(.caption)
-                                        .foregroundStyle(CarTheme.muted)
-                                    Button {
-                                        requestRemoval(groove.id)
-                                    } label: {
-                                        Image(systemName: "minus.circle")
-                                            .foregroundStyle(CarTheme.muted)
-                                            .frame(width: 26, height: 35)
-                                    }
-                                    .disabled(grooves.count <= 1)
-                                    .accessibilityLabel("Remove groove")
-                                }
-                                if !groove.isValid {
-                                    Text("Enter a value between 0 and 15 mm.")
-                                        .font(.caption)
-                                        .foregroundStyle(CarTheme.danger)
-                                }
-                            }
-                            if index < grooves.count - 1 {
-                                Divider().overlay(CarTheme.raised)
-                            }
-                        }
-
-                        Divider().overlay(CarTheme.raised)
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("Minimum measured depth")
-                                .font(.subheadline)
-                                .foregroundStyle(CarTheme.muted)
+                            SectionLabel(title: "Tread grooves", symbol: "ruler")
                             Spacer()
-                            if let depth = minimumDepth {
-                                Text(depth, format: .number.precision(.fractionLength(1)))
-                                    .font(.title3.bold().monospacedDigit())
+                            Button {
+                                if grooves.count > 1 {
+                                    let last = grooves.last!
+                                    if last.value != nil { pendingRemoval = last.id }
+                                    else { grooves.removeLast() }
+                                }
+                            } label: { Image(systemName: "minus") }
+                                .disabled(grooves.count <= 1)
+                                .accessibilityLabel("Remove last groove")
+                                .buttonStyle(.bordered)
+                            Button {
+                                if grooves.count < 12 { grooves.append(GrooveDraft(TreadLane())) }
+                            } label: { Image(systemName: "plus") }
+                                .disabled(grooves.count >= 12)
+                                .accessibilityLabel("Add groove")
+                                .buttonStyle(.borderedProminent)
+                        }
+                        ForEach(Array(grooves.enumerated()), id: \.element.id) { index, groove in
+                            HStack(spacing: 10) {
+                                Text("\(index + 1)")
+                                    .font(.headline.monospacedDigit())
+                                    .frame(width: 24)
+                                Text("Groove").font(.subheadline)
+                                Spacer()
+                                TextField("—", text: $grooves[index].text)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 80)
+                                    .padding(10)
+                                    .background(CarTheme.raised, in: RoundedRectangle(cornerRadius: 10))
+                                Text("mm").foregroundStyle(CarTheme.muted)
+                                Button {
+                                    if groove.value != nil { pendingRemoval = groove.id }
+                                    else { remove(groove.id) }
+                                } label: {
+                                    Image(systemName: "minus.circle")
+                                        .foregroundStyle(CarTheme.muted)
+                                }
+                                .disabled(grooves.count <= 1)
+                                .accessibilityLabel("Remove groove")
+                            }
+                            if !groove.isValid {
+                                Text("Enter a value between 0 and 15 mm.")
+                                    .font(.caption).foregroundStyle(CarTheme.danger)
+                            }
+                            if index < grooves.count - 1 { Divider().overlay(CarTheme.raised) }
+                        }
+                        HStack {
+                            Text("Minimum measured depth").foregroundStyle(CarTheme.muted)
+                            Spacer()
+                            if let minDepth = grooves.compactMap(\.value).min() {
+                                Text(minDepth, format: .number.precision(.fractionLength(1)))
+                                    .foregroundStyle(TreadVisual.color(minDepth))
                                 Text("mm")
-                                    .foregroundStyle(CarTheme.muted)
                             } else {
                                 Text("—")
-                                    .foregroundStyle(CarTheme.muted)
                             }
                         }
                     }
                 }
 
                 Panel {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Notes").font(.headline)
+                    VStack(alignment: .leading, spacing: 12) {
+                        SectionLabel(title: "Tire details", symbol: "info.circle")
+                        field("Tire size", placeholder: "225/40 R18", value: $size)
+                        field("Manufacturer", placeholder: "Bridgestone", value: $manufacturer)
+                        field("Model", placeholder: "Turanza 6", value: $model)
+                        field("DOT", placeholder: "e.g. 2424", value: $dot)
+                        Text("Notes").font(.subheadline)
                         TextField("Optional tire notes", text: $notes, axis: .vertical)
                             .lineLimit(2...5)
                             .padding(12)
@@ -408,8 +509,13 @@ struct TireDetailView: View {
                 }
 
                 Button {
-                    store.updateTire(position: position, lanes: grooves.map { $0.stored() },
-                                     notes: notes.trimmingCharacters(in: .whitespacesAndNewlines))
+                    let record = TireRecord(position: position, lanes: grooves.map { $0.stored() },
+                                            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
+                                            manufacturer: manufacturer.trimmingCharacters(in: .whitespacesAndNewlines),
+                                            model: model.trimmingCharacters(in: .whitespacesAndNewlines),
+                                            size: size.trimmingCharacters(in: .whitespacesAndNewlines),
+                                            dot: dot.trimmingCharacters(in: .whitespacesAndNewlines))
+                    store.updateTire(record, in: setID)
                     dismiss()
                 } label: {
                     Label("Save measurements", systemImage: "checkmark.circle.fill")
@@ -417,13 +523,9 @@ struct TireDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(!canSave)
-
-                Text("Empty fields mean a groove has not been measured.")
-                    .font(.caption)
-                    .foregroundStyle(CarTheme.muted)
+                .disabled(!valid)
             }
-            .padding(20)
+            .padding(18)
         }
         .scrollIndicators(.hidden)
         .navigationTitle("Tire details")
@@ -443,14 +545,14 @@ struct TireDetailView: View {
         .carPage()
     }
 
-    private func requestRemoval(_ id: UUID?) {
-        guard let id, grooves.count > 1, let target = grooves.first(where: { $0.id == id }) else {
-            return
-        }
-        if target.value != nil || !target.text.isEmpty {
-            pendingRemoval = id
-        } else {
-            remove(id)
+    private func field(_ title: LocalizedStringKey, placeholder: String,
+                       value: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.subheadline)
+            TextField(placeholder, text: value)
+                .textInputAutocapitalization(.words)
+                .padding(12)
+                .background(CarTheme.raised, in: RoundedRectangle(cornerRadius: 10))
         }
     }
 

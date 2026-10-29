@@ -39,16 +39,61 @@ final class GarageStore: ObservableObject {
         commit { $0.car = car }
     }
 
-    func updateTire(position: TirePosition, lanes: [TreadLane], notes: String) {
+    func selectTireSet(_ id: UUID) {
         commit { snapshot in
-            // Every groove has a stable ID so edits and removals stay attached to
-            // the correct measurement rather than shifting data between grooves.
-            let new = TireRecord(position: position, lanes: lanes, notes: notes)
-            if let index = snapshot.tires.firstIndex(where: { $0.position == position }) {
-                snapshot.tires[index] = new
-            } else {
-                snapshot.tires.append(new)
+            guard snapshot.tireSets.contains(where: { $0.id == id }) else { return }
+            snapshot.activeTireSetID = id
+        }
+    }
+
+    func createTireSet(name: String, season: TireSeason) {
+        commit { snapshot in
+            let set = TireSet(name: name, season: season)
+            snapshot.tireSets.append(set)
+            snapshot.activeTireSetID = set.id
+        }
+    }
+
+    func updateTireSet(id: UUID, name: String, season: TireSeason) {
+        commit { snapshot in
+            guard let index = snapshot.tireSets.firstIndex(where: { $0.id == id }) else { return }
+            snapshot.tireSets[index].name = name
+            snapshot.tireSets[index].season = season
+        }
+    }
+
+    func deleteTireSet(_ id: UUID) {
+        commit { snapshot in
+            guard snapshot.tireSets.count > 1 else { return }
+            snapshot.tireSets.removeAll(where: { $0.id == id })
+            if snapshot.activeTireSetID == id, let first = snapshot.tireSets.first {
+                snapshot.activeTireSetID = first.id
             }
+        }
+    }
+
+    func updateTire(_ tire: TireRecord, in setID: UUID) {
+        commit { snapshot in
+            guard let set = snapshot.tireSets.firstIndex(where: { $0.id == setID }) else { return }
+            if let index = snapshot.tireSets[set].tires.firstIndex(where: { $0.position == tire.position }) {
+                snapshot.tireSets[set].tires[index] = tire
+            } else {
+                snapshot.tireSets[set].tires.append(tire)
+            }
+        }
+    }
+
+    /// Quick +/- buttons in the four-wheel screen also persist immediately.
+    func changeGrooveCount(position: TirePosition, setID: UUID, change: Int) {
+        commit { snapshot in
+            guard let set = snapshot.tireSets.firstIndex(where: { $0.id == setID }),
+                  let wheel = snapshot.tireSets[set].tires.firstIndex(where: { $0.position == position }) else {
+                return
+            }
+            var lanes = snapshot.tireSets[set].tires[wheel].lanes
+            if change > 0 && lanes.count < 12 { lanes.append(TreadLane()) }
+            if change < 0 && lanes.count > 1 { lanes.removeLast() }
+            snapshot.tireSets[set].tires[wheel].lanes = lanes
         }
     }
 

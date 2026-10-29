@@ -14,6 +14,11 @@ struct SettingsView: View {
                     LabeledContent("License plate", value: store.snapshot.car.licensePlate)
                 }
                 LabeledContent("Odometer", value: "\(store.snapshot.car.odometerKM.formatted()) km")
+                LabeledContent("VIN", value: store.snapshot.car.vin?.isEmpty == false
+                    ? (store.snapshot.car.vin ?? "") : "Not entered")
+                if let details = store.snapshot.car.details, !details.isEmpty {
+                    Text(details).font(.subheadline).foregroundStyle(.secondary)
+                }
                 Button("Edit vehicle") { isEditingCar = true }
             }
             Section("Vehicle photo") {
@@ -69,6 +74,8 @@ struct VehicleEditorView: View {
     @State private var plate: String
     @State private var year: String
     @State private var odometer: String
+    @State private var vin: String
+    @State private var details: String
 
     init(store: GarageStore) {
         self.store = store
@@ -79,12 +86,15 @@ struct VehicleEditorView: View {
         _plate = State(initialValue: car.licensePlate)
         _year = State(initialValue: car.year.map(String.init) ?? "")
         _odometer = State(initialValue: String(car.odometerKM))
+        _vin = State(initialValue: car.vin ?? "")
+        _details = State(initialValue: car.details ?? "")
     }
 
     private var valid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         && (Int(odometer).map { $0 >= 0 } ?? false)
         && (year.isEmpty || (Int(year).map { (1886...2100).contains($0) } ?? false))
+        && (vin.isEmpty || vin.trimmingCharacters(in: .whitespacesAndNewlines).count == 17)
     }
 
     var body: some View {
@@ -99,9 +109,14 @@ struct VehicleEditorView: View {
                         .keyboardType(.numberPad)
                     TextField("Odometer (km)", text: $odometer)
                         .keyboardType(.numberPad)
+                    TextField("VIN", text: $vin)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                    TextField("Car details", text: $details, axis: .vertical)
+                        .lineLimit(3...7)
                 }
                 if !valid {
-                    Text("Enter a name, valid mileage and optional model year.")
+                    Text("Enter a name, valid mileage, model year and a 17-character VIN (or leave it empty).")
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
@@ -122,7 +137,9 @@ struct VehicleEditorView: View {
                             model: model.trimmingCharacters(in: .whitespacesAndNewlines),
                             year: Int(year),
                             licensePlate: plate.trimmingCharacters(in: .whitespacesAndNewlines),
-                            odometerKM: Int(odometer) ?? 0)
+                            odometerKM: Int(odometer) ?? 0,
+                            vin: vin.uppercased().trimmingCharacters(in: .whitespacesAndNewlines),
+                            details: details.trimmingCharacters(in: .whitespacesAndNewlines))
                         store.updateCar(car)
                         dismiss()
                     }

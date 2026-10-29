@@ -49,3 +49,19 @@ Photos are stored separately in the local Application Support directory (or the 
 ## Implementation status
 
 The requirements in `PLANS/PLANS.md` are implemented in source. Device signing, App Group provisioning and physical iPhone testing remain environment-dependent. The GitHub Actions workflow validates builds on an Apple runner.
+
+
+## Latest UI and tire-set update
+
+- The **home screen matches the provided layout concept**: large customizable car image, car name, VIN, vehicle details, mileage, and a five-item bottom navigation (problems, tires, My Car, service, settings).
+- Add/edit VIN (17 characters) and free-text vehicle details in **My Car** or Settings.
+- **Multiple tire sets**, each with a name and summer / winter / all-season classification. Select the mounted set from the Tires screen. Creating a set starts with four independent, unmeasured tires; deleting a set requires confirmation and cannot delete the final set.
+- **Per-wheel specifications:** tire size, manufacturer, model, DOT and notes. Each set has its own four tires and its own tread measurements.
+- **Connected tread strips:** adjacent grooves form one tire tread block; each groove has a separate measured value and a colored vertical line indicating approximate depth (green ≥5, yellow ≥3.5, orange ≥1.6, red below 1.6 mm; gray = unmeasured). These colors are illustrative, **not legal minimums or inspection advice**.
+- Each wheel card offers **+ / −** for 1–12 grooves. Removing a groove containing a measurement needs confirmation. Tap a wheel for full-size measurements and tire specifications.
+- Overview widgets and readings use **only the selected tire set**, and use the *minimum measured depth* rather than averaging.
+- **Existing data:** JSON from earlier releases with a top-level \`tires\` array is migrated into the first tire set. Existing grooves, notes and vehicle fields are retained. Previous vehicle details without VIN remain valid.
+
+### Installation
+
+Open [GitHub Actions](https://github.com/kaskader-idk/MyCar/actions), select the latest successful **iOS build**, and download the \`MyCar-unsigned-ipa\` artifact. Unzip it, then **sign** the IPA with a compatible tool before installation; the unsigned IPA cannot be installed directly. Enabling shared App Group entitlements for widgets may require suitable Apple Developer provisioning. A source build with Xcode supports simulator testing.

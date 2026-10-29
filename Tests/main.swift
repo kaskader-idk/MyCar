@@ -56,3 +56,46 @@ require(migratedEmpty.lanes.count == 4 && migratedEmpty.measuredLaneCount == 0,
         "Unmeasured legacy record migrates without values")
 
 print("Garage model checks passed (new grooves, min depth, persistence, legacy migration).")
+
+
+
+// v2 snapshot had tires directly and no tireSets. Migrate measurements and car.
+let oldSnapshotJSON = """
+{
+ "car":{"name":"Old car","manufacturer":"BMW","model":"320d","year":2010,
+        "licensePlate":"RI-123","odometerKM":286000},
+ "tires":[{"position":"frontLeft","lanes":[{"id":"00000000-0000-0000-0000-000000000001","depthMM":5.5,"measuredAt":780000000}],
+           "notes":"old tire"}],
+ "issues":[],
+ "service":{"dueDate":null,"dueOdometerKM":null,"notes":"","lastServiceDate":null}
+}
+"""
+let upgraded = try decoder.decode(GarageSnapshot.self, from: Data(oldSnapshotJSON.utf8))
+require(upgraded.tireSets.count == 1, "Old snapshot becomes exactly one tire set")
+require(approximatelyEqual(upgraded.tire(at: .frontLeft).treadDepthMM, 5.5),
+        "Old tire measurement is migrated")
+require(upgraded.car.name == "Old car", "Old vehicle data preserved")
+require(upgraded.car.vin == nil, "New optional VIN works for old files")
+
+var multiSet = upgraded
+let second = TireSet(name: "Winter", season: .winter,
+                     tires: [TireRecord(position: .frontLeft,
+                            lanes: [TreadLane(depthMM: 6.3)],
+                            manufacturer: "Michelin", model: "Alpin", size: "225/45 R17",
+                            dot: "2525")])
+multiSet.tireSets.append(second)
+multiSet.activeTireSetID = second.id
+require(approximatelyEqual(multiSet.tire(at: .frontLeft).treadDepthMM, 6.3),
+        "Selecting tire set changes active readings")
+require(multiSet.tire(at: .frontLeft).manufacturer == "Michelin",
+        "Individual tire manufacturer is retained")
+let serializedSets = try encoder.encode(multiSet)
+let restoredSets = try decoder.decode(GarageSnapshot.self, from: serializedSets)
+require(restoredSets.tireSets.count == 2, "All tire sets survive JSON roundtrip")
+require(restoredSets.activeTireSetID == second.id, "Active tire set persists")
+require(restoredSets.tire(at: .frontLeft).size == "225/45 R17", "Individual tire size persists")
+require(restoredSets.tireSets[0].tire(at: .frontLeft).notes == "old tire",
+        "Inactive set preserves its own tire details")
+require(restoredSets.tireSets[1].season == .winter, "Season selection persists")
+
+print("Tire set and backward-compatibility tests passed.")
