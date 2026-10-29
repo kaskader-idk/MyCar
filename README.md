@@ -65,3 +65,12 @@ The requirements in `PLANS/PLANS.md` are implemented in source. Device signing, 
 ### Installation
 
 Open [GitHub Actions](https://github.com/kaskader-idk/MyCar/actions), select the latest successful **iOS build**, and download the \`MyCar-unsigned-ipa\` artifact. Unzip it, then **sign** the IPA with a compatible tool before installation; the unsigned IPA cannot be installed directly. Enabling shared App Group entitlements for widgets may require suitable Apple Developer provisioning. A source build with Xcode supports simulator testing.
+
+
+## Multi-car garage and widget synchronization
+
+- Manage vehicles under **Settings → My vehicles**. Add cars, select one, or delete the selected vehicle (at least one is kept).
+- Swipe horizontally on **My garage, Tires, Problems, or Service** to move between cars; the selector shows the active car. Tire sets, issues, service and vehicle details are separate for every car. The widgets display the currently selected car.
+- Your old single-car records migrate into the first garage vehicle. Each newly created vehicle starts with its own empty maintenance and tire data.
+- The app immediately seeds shared widget data at launch and updates widget timelines whenever the selected car or its records change. Widgets never read their own isolated standard preferences as though they were main-app data.
+- **Widgets require a correctly provisioned App Group** (`group.dev.kaskader.mycar`) in BOTH the app and embedded widget extension. When signing with Sideloadly/free Personal Team the capability may be stripped; no app-code change can bypass iOS sandboxing. Check **Settings → Widget sync** in MyCar. If it says *App Group signing missing*, the IPA must be signed with matching App Group entitlements using a suitable Apple Developer team. After installation launch MyCar once and re-add the widgets if needed.

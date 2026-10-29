@@ -71,6 +71,21 @@ struct SettingsView: View {
                     Text("Extra large").tag("extra")
                 }
             }
+            Section("Widget sync") {
+                if FileManager.default.containerURL(
+                    forSecurityApplicationGroupIdentifier: GaragePersistence.appGroup
+                ) != nil {
+                    Label("Shared storage available", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Open MyCar after installation to refresh the widgets.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Label("App Group signing missing", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Widgets cannot access your car data without App Group entitlements. A sideloaded IPA may not preserve them.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
             Section("Privacy") {
                 Text("Vehicle data is stored locally and shared only with the MyCar widgets on this device.")
                     .font(.subheadline)
