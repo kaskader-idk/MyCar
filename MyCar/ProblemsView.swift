@@ -130,6 +130,12 @@ struct ProblemsView: View {
             .padding(20)
         }
         .scrollIndicators(.hidden)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 70).onEnded { value in
+                guard abs(value.translation.width) > abs(value.translation.height) * 1.4 else { return }
+                store.nextCar(direction: value.translation.width < 0 ? 1 : -1)
+            }
+        )
         .navigationTitle("Problems")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showNew) { IssueEditorView(store: store, issue: nil) }

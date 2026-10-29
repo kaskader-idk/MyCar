@@ -125,6 +125,12 @@ struct DashboardView: View {
             .padding(18)
         }
         .scrollIndicators(.hidden)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 70).onEnded { value in
+                guard abs(value.translation.width) > abs(value.translation.height) * 1.4 else { return }
+                store.nextCar(direction: value.translation.width < 0 ? 1 : -1)
+            }
+        )
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomNavigation }
         .sheet(isPresented: $editingCar) { VehicleEditorView(store: store) }
         .navigationBarHidden(true)

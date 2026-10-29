@@ -99,3 +99,17 @@ require(restoredSets.tireSets[0].tire(at: .frontLeft).notes == "old tire",
 require(restoredSets.tireSets[1].season == .winter, "Season selection persists")
 
 print("Tire set and backward-compatibility tests passed.")
+
+
+// Multi-car migration and isolation checks.
+let archived = try decoder.decode(GarageArchive.self, from: Data(
+    #"{"cars":[{"id":"00000000-0000-0000-0000-000000000011","car":{"name":"First","manufacturer":"","model":"","licensePlate":"","odometerKM":123},"issues":[],"service":{"notes":""}},{"id":"00000000-0000-0000-0000-000000000022","car":{"name":"Second","manufacturer":"","model":"","licensePlate":"","odometerKM":456},"issues":[],"service":{"notes":""}}],"selectedCarID":"00000000-0000-0000-0000-000000000022"}"#.utf8))
+require(archived.cars.count == 2, "Two vehicles are kept separate")
+require(archived.selected.car.name == "Second", "Selected car restored")
+let restoredArchive = try decoder.decode(GarageArchive.self, from: encoder.encode(archived))
+require(restoredArchive.selected.car.odometerKM == 456, "Selected vehicle data persists")
+require(restoredArchive.cars[0].car.odometerKM == 123, "Other vehicle stays unchanged")
+var mutableArchive = restoredArchive
+mutableArchive.selectedCarID = mutableArchive.cars[0].id
+require(mutableArchive.selected.car.name == "First", "Car selection switches records")
+print("Multi-car archive isolation checks passed.")

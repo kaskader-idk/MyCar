@@ -11,25 +11,27 @@ private enum WidgetStyle {
 struct GarageWidgetEntry: TimelineEntry {
     let date: Date
     let garage: GarageSnapshot
+    let hasSharedData: Bool
 }
 
 struct GarageWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> GarageWidgetEntry {
-        GarageWidgetEntry(date: .now, garage: GarageSnapshot())
+        GarageWidgetEntry(date: .now, garage: GarageSnapshot(), hasSharedData: false)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (GarageWidgetEntry) -> Void) {
-        completion(GarageWidgetEntry(date: .now, garage: GaragePersistence.load()))
+        let snapshot = GaragePersistence.loadForWidget()
+        completion(GarageWidgetEntry(date: .now, garage: snapshot ?? GarageSnapshot(), hasSharedData: snapshot != nil))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<GarageWidgetEntry>) -> Void) {
         let now = Date()
-        let snapshot = GaragePersistence.load()
+        let snapshot = GaragePersistence.loadForWidget()
         let calendar = Calendar.current
         let midnight = calendar.startOfDay(for: now)
         let entries = (0..<8).compactMap { day -> GarageWidgetEntry? in
             guard let date = calendar.date(byAdding: .day, value: day, to: midnight) else { return nil }
-            return GarageWidgetEntry(date: day == 0 ? now : date, garage: snapshot)
+            return GarageWidgetEntry(date: day == 0 ? now : date, garage: snapshot ?? GarageSnapshot(), hasSharedData: snapshot != nil)
         }
         let refreshDate = calendar.date(byAdding: .day, value: 8, to: midnight) ?? now.addingTimeInterval(86400)
         completion(Timeline(entries: entries, policy: .after(refreshDate)))
@@ -52,7 +54,11 @@ struct ServiceStatusWidgetView: View {
                 .font(.caption2.bold())
                 .foregroundStyle(WidgetStyle.accent)
                 .lineLimit(1)
-            if !service.isConfigured {
+            if !entry.hasSharedData {
+                Text("Open MyCar to sync").font(.headline)
+                Text("Widgets need shared App Group signing.")
+                    .font(.caption).foregroundStyle(WidgetStyle.muted)
+            } else if !service.isConfigured {
                 Spacer(minLength: 3)
                 Text("No service planned").font(.headline)
                 Text("Open MyCar to add a reminder.")
@@ -132,6 +138,10 @@ struct GarageOverviewWidgetView: View {
                     .font(.caption2.bold())
                     .foregroundStyle(WidgetStyle.muted)
             }
+            if !entry.hasSharedData {
+                Text("Open MyCar to sync. App Group signing required.")
+                    .font(.caption).foregroundStyle(WidgetStyle.muted)
+            } else {
             HStack(spacing: 10) {
                 overviewItem(symbol: "speedometer", title: "Mileage",
                              value: "\(entry.garage.car.odometerKM.formatted()) km")
@@ -139,6 +149,7 @@ struct GarageOverviewWidgetView: View {
                              value: String(entry.garage.activeIssueCount))
                 overviewItem(symbol: "circle.dotted.circle", title: "Min. tread",
                              value: minimumDepth.map { String(format: "%.1f mm", $0) } ?? "—")
+            }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

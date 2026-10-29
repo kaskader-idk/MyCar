@@ -5,9 +5,29 @@ struct SettingsView: View {
     @AppStorage("mycar.language") private var language = "system"
     @AppStorage("mycar.textSize") private var textSize = "normal"
     @State private var isEditingCar = false
+    @State private var addingCar = false
+    @State private var newCarName = ""
+    @State private var confirmDelete = false
 
     var body: some View {
         Form {
+            Section("My vehicles") {
+                ForEach(store.cars) { car in
+                    Button {
+                        store.selectCar(car.id)
+                    } label: {
+                        HStack {
+                            Text(car.car.name)
+                            Spacer()
+                            if car.id == store.snapshot.id { Image(systemName: "checkmark.circle.fill") }
+                        }
+                    }
+                }
+                Button("Add vehicle", systemImage: "plus") { addingCar = true }
+                if store.cars.count > 1 {
+                    Button("Delete selected vehicle", role: .destructive) { confirmDelete = true }
+                }
+            }
             Section("Vehicle") {
                 LabeledContent("Name", value: store.snapshot.car.name)
                 if !store.snapshot.car.licensePlate.isEmpty {
@@ -61,6 +81,18 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $isEditingCar) { VehicleEditorView(store: store) }
+        .alert("Add vehicle", isPresented: $addingCar) {
+            TextField("Vehicle name", text: $newCarName)
+            Button("Add") {
+                let title = newCarName.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !title.isEmpty { store.createCar(name: title) }
+                newCarName = ""
+            }
+            Button("Cancel", role: .cancel) { newCarName = "" }
+        } message: { Text("Enter a name for your new car.") }
+        .confirmationDialog("Delete selected vehicle?", isPresented: $confirmDelete) {
+            Button("Delete vehicle", role: .destructive) { store.deleteCurrentCar() }
+        } message: { Text("This permanently deletes its tire sets, problems and service records.") }
         .carPage()
     }
 }

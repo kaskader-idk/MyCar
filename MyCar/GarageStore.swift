@@ -5,34 +5,77 @@ import UIKit
 
 @MainActor
 final class GarageStore: ObservableObject {
-    @Published private(set) var snapshot: GarageSnapshot
+    @Published private(set) var archive: GarageArchive
+    var snapshot: GarageSnapshot { archive.selected }
+    var cars: [GarageSnapshot] { archive.cars }
     @Published private(set) var carPhoto: UIImage?
 
     init() {
-        snapshot = GaragePersistence.load()
-        carPhoto = CarPhotoStorage.load()
+        archive = GaragePersistence.loadArchive()
+        carPhoto = CarPhotoStorage.load(id: archive.selectedCarID)
     }
 
     /// Keeps the photo on the device, separate from the small widget JSON snapshot.
     @discardableResult
     func updateCarPhoto(from data: Data) -> Bool {
         guard let image = UIImage(data: data),
-              let saved = CarPhotoStorage.save(image) else { return false }
+              let saved = CarPhotoStorage.save(image, id: archive.selectedCarID) else { return false }
         carPhoto = saved
         return true
     }
 
     func removeCarPhoto() {
-        CarPhotoStorage.remove()
+        CarPhotoStorage.remove(id: archive.selectedCarID)
         carPhoto = nil
     }
 
     private func commit(_ change: (inout GarageSnapshot) -> Void) {
-        var updated = snapshot
-        change(&updated)
-        snapshot = updated
-        GaragePersistence.save(updated)
+        var updated = archive
+        guard let index = updated.cars.firstIndex(where: { $0.id == updated.selectedCarID }) else { return }
+        change(&updated.cars[index])
+        persist(updated)
+    }
+
+    private func persist(_ updated: GarageArchive) {
+        archive = updated
+        GaragePersistence.saveArchive(updated)
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    func selectCar(_ id: UUID) {
+        guard archive.cars.contains(where: { $0.id == id }) else { return }
+        var updated = archive
+        updated.selectedCarID = id
+        persist(updated)
+        carPhoto = CarPhotoStorage.load(id: id)
+    }
+
+    func nextCar(direction: Int) {
+        guard let index = archive.cars.firstIndex(where: { $0.id == archive.selectedCarID }) else { return }
+        let destination = index + direction
+        guard archive.cars.indices.contains(destination) else { return }
+        selectCar(archive.cars[destination].id)
+    }
+
+    func createCar(name: String) {
+        var updated = archive
+        var new = GarageSnapshot()
+        new.car.name = name
+        updated.cars.append(new)
+        updated.selectedCarID = new.id
+        persist(updated)
+        carPhoto = nil
+    }
+
+    func deleteCurrentCar() {
+        guard archive.cars.count > 1 else { return }
+        let oldID = archive.selectedCarID
+        var updated = archive
+        updated.cars.removeAll(where: { $0.id == oldID })
+        updated.selectedCarID = updated.cars[0].id
+        persist(updated)
+        CarPhotoStorage.remove(id: oldID)
+        carPhoto = CarPhotoStorage.load(id: updated.selectedCarID)
     }
 
     func updateCar(_ car: CarProfile) {
@@ -125,25 +168,25 @@ final class GarageStore: ObservableObject {
 
 /// Separate image file to avoid putting large photos into UserDefaults / widget data.
 private enum CarPhotoStorage {
-    private static var imageURL: URL? {
+    private static func imageURL(id: UUID) -> URL? {
         let manager = FileManager.default
         guard let root = manager.containerURL(forSecurityApplicationGroupIdentifier: GaragePersistence.appGroup)
             ?? manager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil
         }
         return root.appendingPathComponent("MyCar", isDirectory: true)
-            .appendingPathComponent("vehicle-photo.jpg")
+            .appendingPathComponent("vehicle-\(id.uuidString).jpg")
     }
 
-    static func load() -> UIImage? {
-        guard let imageURL,
+    static func load(id: UUID) -> UIImage? {
+        guard let imageURL = imageURL(id: id),
               let data = try? Data(contentsOf: imageURL) else { return nil }
         return UIImage(data: data)
     }
 
     @discardableResult
-    static func save(_ image: UIImage) -> UIImage? {
-        guard let imageURL else { return nil }
+    static func save(_ image: UIImage, id: UUID) -> UIImage? {
+        guard let imageURL = imageURL(id: id) else { return nil }
         // Downsize imported photos to limit disk usage and dashboard memory use.
         let longest = max(image.size.width, image.size.height)
         guard longest > 0 else { return nil }
@@ -165,8 +208,8 @@ private enum CarPhotoStorage {
         }
     }
 
-    static func remove() {
-        guard let imageURL else { return }
+    static func remove(id: UUID) {
+        guard let imageURL = imageURL(id: id) else { return }
         try? FileManager.default.removeItem(at: imageURL)
     }
 }

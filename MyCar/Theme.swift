@@ -70,3 +70,44 @@ struct EmptyPanel: View {
         }
     }
 }
+
+
+struct CarSwitcher: View {
+    @ObservedObject var store: GarageStore
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button { store.nextCar(direction: -1) } label: {
+                Image(systemName: "chevron.left").frame(width: 32, height: 34)
+            }
+            .disabled(store.cars.first?.id == store.snapshot.id)
+            Spacer(minLength: 0)
+            VStack(spacing: 4) {
+                Text(store.snapshot.car.name).font(.headline).lineLimit(1)
+                HStack(spacing: 5) {
+                    ForEach(store.cars) { car in
+                        Circle()
+                            .fill(car.id == store.snapshot.id ? CarTheme.accent : CarTheme.muted.opacity(0.4))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                .accessibilityLabel("Swipe left or right to switch cars")
+            }
+            Spacer(minLength: 0)
+            Button { store.nextCar(direction: 1) } label: {
+                Image(systemName: "chevron.right").frame(width: 32, height: 34)
+            }
+            .disabled(store.cars.last?.id == store.snapshot.id)
+        }
+        .buttonStyle(.plain)
+        .padding(11)
+        .background(CarTheme.surface, in: RoundedRectangle(cornerRadius: 17))
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 55).onEnded { value in
+                if value.translation.width < -60 { store.nextCar(direction: 1) }
+                if value.translation.width > 60 { store.nextCar(direction: -1) }
+            }
+        )
+    }
+}
